@@ -14,6 +14,9 @@
 
 #include <cinttypes>
 #include <memory>
+#include <chrono>
+
+using namespace std::chrono_literals;
 
 #include "example_interfaces/srv/add_two_ints.hpp"
 #include "rclcpp/rclcpp.hpp"
@@ -31,14 +34,18 @@ void handle_service(
     g_node->get_logger(),
     "request: %" PRId64 " + %" PRId64, request->a, request->b);
   response->sum = request->a + request->b;
+  std::this_thread::sleep_for(2s);
 }
 
 int main(int argc, char ** argv)
 {
   rclcpp::init(argc, argv);
   g_node = rclcpp::Node::make_shared("minimal_service");
-  auto server = g_node->create_service<AddTwoInts>("add_two_ints", handle_service);
-  rclcpp::spin(g_node);
+  auto group = g_node->create_callback_group(rclcpp::CallbackGroupType::Reentrant);
+  auto server = g_node->create_service<AddTwoInts>("add_two_ints", handle_service, rmw_qos_profile_services_default, group);
+  rclcpp::executors::MultiThreadedExecutor exec;
+  exec.add_node(g_node);
+  exec.spin();
   rclcpp::shutdown();
   g_node = nullptr;
   return 0;
